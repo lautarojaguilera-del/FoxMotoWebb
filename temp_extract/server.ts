@@ -124,37 +124,6 @@ async function startServer() {
     });
   });
 
-  app.get("/api/scrape/progress", (req, res) => {
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-
-    const sendUpdate = () => {
-      res.write(`data: ${JSON.stringify(scrapeProgress)}\n\n`);
-    };
-
-    const intervalId = setInterval(sendUpdate, 1000);
-    sendUpdate();
-
-    req.on('close', () => {
-      clearInterval(intervalId);
-    });
-  });
-
-  app.post("/api/scrape/start", (req, res) => {
-    if (isScraping) {
-      return res.status(400).json({ error: "Sync already in progress" });
-    }
-    scrapeAllPages();
-    res.json({ message: "Sync started" });
-  });
-
-  app.post("/api/scrape/reset", (req, res) => {
-    cachedProducts = [];
-    scrapeProgress = { current_page: 0, total_products: 0, status: 'idle' };
-    res.json({ message: "Catalog reset" });
-  });
-
   app.post("/api/checkout", express.json(), async (req, res) => {
     const { items, customer } = req.body;
     

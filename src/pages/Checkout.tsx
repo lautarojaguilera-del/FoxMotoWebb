@@ -74,25 +74,10 @@ export default function Checkout({
       return;
     }
 
-    setCheckoutStep('processing');
+    // Skip processing state and backend call per user request
+    // setCheckoutStep('processing');
     
     try {
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          items: cart,
-          customer: customerForm
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.details || errorData.error || 'Error en el checkout automatizado');
-      }
-      
       const text = cart.map((item: any) => `${item.quantity}x ${item.product.title} (${item.product.sku}) - ${item.product.price}`).join('\n');
       const total = cart.reduce((sum: number, item: any) => {
         const cleaned = item.product.price.replace(/[^0-9,-]+/g, "").replace(/\./g, "").replace(",", ".");
@@ -104,8 +89,8 @@ export default function Checkout({
       
       window.open(`https://wa.me/5492915221351?text=${encodeURIComponent(message)}`, '_blank');
       
-      toast.success('¡Pedido enviado con éxito!', {
-        description: 'Te enviamos un correo de confirmación y te contactaremos por WhatsApp.'
+      toast.success('¡Pedido preparado!', {
+        description: 'Te hemos redirigido a WhatsApp para finalizar la coordinación.'
       });
 
       // Track Purchase Event
@@ -120,30 +105,14 @@ export default function Checkout({
         console.error('Tracking error', e);
       }
 
-      // Decrement stock locally
-      setProducts((prevProducts: any) => {
-        const updatedProducts = prevProducts.map((p: any) => {
-          const cartItem = cart.find((item: any) => item.product.sku === p.sku);
-          if (cartItem) {
-            if (p.stock.toLowerCase().includes('ilimitado') || p.stock.toLowerCase().includes('ilimitada')) {
-              return p;
-            }
-            const currentStock = parseInt(p.stock.replace(/[^0-9]/g, ''), 10);
-            if (!isNaN(currentStock)) {
-              return { ...p, stock: `Stock: ${Math.max(0, currentStock - cartItem.quantity)}` };
-            }
-          }
-          return p;
-        });
-        localStorage.setItem('foxmoto_products', JSON.stringify(updatedProducts));
-        return updatedProducts;
-      });
+      // Stock decrement removed per user request
+      // We no longer reserve stock locally or on Dux.
 
       setCheckoutStep('success');
       setCart([]);
     } catch (error) {
       console.error(error);
-      toast.error('Hubo un error al procesar tu pedido. Por favor, intenta de nuevo o usa WhatsApp.');
+      toast.error('Hubo un error al preparar tu pedido. Por favor, intenta de nuevo o usa WhatsApp.');
       setCheckoutStep('form');
     }
   };
@@ -182,7 +151,7 @@ export default function Checkout({
         >
           <Loader2 className="animate-spin text-[#FF4500] mx-auto mb-6" size={48} />
           <h2 className="text-xl font-bold text-white mb-2">Procesando tu pedido...</h2>
-          <p className="text-gray-400 text-sm">Estamos automatizando tu compra en FoxMoto. Esto puede demorar unos segundos, por favor no cierres esta ventana.</p>
+          <p className="text-gray-400 text-sm">Estamos preparando los datos de tu compra. En unos segundos te redirigiremos a WhatsApp para finalizar.</p>
         </motion.div>
       </div>
     );
