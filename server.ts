@@ -1,6 +1,5 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import puppeteer from "puppeteer";
 import path from "path";
 import { db } from "./src/firebase";
 import { collection, doc, setDoc, getDocs, writeBatch, serverTimestamp } from "firebase/firestore";
@@ -42,6 +41,15 @@ async function updateScrapeStatus(status: any) {
   }
 }
 
+// Dynamic import for puppeteer to avoid issues on Vercel where it's not used
+async function getBrowser() {
+  const puppeteer = await import("puppeteer");
+  return await puppeteer.launch({
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+  });
+}
+
 async function scrapeAllPages() {
   if (isScraping) return;
   isScraping = true;
@@ -50,12 +58,9 @@ async function scrapeAllPages() {
   console.log("Starting full catalog scrape...");
   await updateScrapeStatus(scrapeProgress);
   
-  const browser = await puppeteer.launch({
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-  });
-  
+  let browser;
   try {
+    browser = await getBrowser();
     const page = await browser.newPage();
     let currentPage = 1;
     let allProducts: any[] = [];
@@ -191,35 +196,29 @@ async function startServer() {
       return res.status(400).json({ error: "Customer details missing" });
     }
 
-    console.log("Processing automated checkout via WhatsApp...");
+    console.log("Processing order for:", customer.email);
     
     try {
-      // Decrement stock in cachedProducts
-      items.forEach((item: any) => {
-        const product = cachedProducts.find(p => p.sku === item.product.sku);
-        if (product) {
-          if (product.stock.toLowerCase().includes('ilimitado') || product.stock.toLowerCase().includes('ilimitada')) {
-            // Do nothing
-          } else {
-            const currentStock = parseInt(product.stock.replace(/[^0-9]/g, ''), 10);
-            if (!isNaN(currentStock)) {
-              product.stock = `Stock: ${Math.max(0, currentStock - item.quantity)}`;
-            }
-          }
-        }
+      // Record order in Firestore
+      const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      await setDoc(doc(db, 'orders', orderId), {
+        items,
+        customer,
+        status: 'pending',
+        createdAt: serverTimestamp()
       });
+
+      // Optional: Update stock in Firestore if needed
+      // For now, we just return success as the frontend handles the WhatsApp redirect
       
       res.json({ 
         success: true, 
-        message: "Checkout automated successfully!",
-        orderDetails: {
-          success: true,
-          url: "whatsapp"
-        }
+        message: "Order recorded successfully",
+        orderId
       });
     } catch (error: any) {
-      console.error("Checkout automation error:", error);
-      res.status(500).json({ error: error.message || "Checkout automation failed" });
+      console.error("Checkout error:", error);
+      res.status(500).json({ error: error.message || "Checkout failed" });
     }
   });
 

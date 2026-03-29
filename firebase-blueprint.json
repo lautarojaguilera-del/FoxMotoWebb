@@ -24,6 +24,18 @@
         "total_products": { "type": "number" },
         "last_run": { "type": "string", "format": "date-time" }
       }
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer order",
+      "type": "object",
+      "properties": {
+        "items": { "type": "array", "description": "List of items in the order" },
+        "customer": { "type": "object", "description": "Customer contact details" },
+        "status": { "type": "string", "enum": ["pending", "completed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["items", "customer", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -34,6 +46,10 @@
     "/status/current": {
       "schema": "ScrapeStatus",
       "description": "Current scraping status"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Collection of all customer orders"
     }
   }
 }
