@@ -35,11 +35,25 @@ async function updateScrapeStatus(status: any) {
 
 // Dynamic import for puppeteer to avoid issues on Vercel where it's not used
 async function getBrowser() {
-  const puppeteer = await import("puppeteer");
-  return await puppeteer.launch({
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-  });
+  if (process.env.VERCEL) {
+    const chromiumModule = await import("@sparticuz/chromium");
+    const chromium = chromiumModule.default || chromiumModule;
+    const puppeteerModule = await import("puppeteer-core");
+    const puppeteer = puppeteerModule.default || puppeteerModule;
+    
+    return await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    });
+  } else {
+    const puppeteer = await import("puppeteer");
+    return await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    });
+  }
 }
 
 export async function scrapeAllPages() {
