@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import { db } from "./src/firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { scrapeAllPages, scrapeProgress, cachedProducts } from "./scraper";
 
 export const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,29 +11,44 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-app.get("/api/products", (req, res) => {
-  res.json({
-    status: scrapeProgress.status,
-    progress: scrapeProgress,
-    products: cachedProducts
-  });
+app.get("/api/products", async (req, res) => {
+  try {
+    const { scrapeProgress, cachedProducts } = await import("./scraper");
+    res.json({
+      status: scrapeProgress.status,
+      progress: scrapeProgress,
+      products: cachedProducts
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch products", details: err.message });
+  }
 });
 
 app.post("/api/scrape/start", async (req, res) => {
-  if (scrapeProgress.isScraping) {
-    return res.status(400).json({ error: "Scrape already in progress" });
+  try {
+    const { scrapeAllPages, scrapeProgress } = await import("./scraper");
+    if (scrapeProgress.isScraping) {
+      return res.status(400).json({ error: "Scrape already in progress" });
+    }
+    
+    // Trigger in background
+    scrapeAllPages().catch(err => console.error("Manual scrape error:", err));
+    
+    res.json({ message: "Scrape started" });
+  } catch (err: any) {
+    console.error("Scrape start error:", err);
+    res.status(500).json({ error: "Failed to start scrape", details: err.message });
   }
-  
-  // Trigger in background
-  scrapeAllPages().catch(err => console.error("Manual scrape error:", err));
-  
-  res.json({ message: "Scrape started" });
 });
 
 app.post("/api/scrape/reset", async (req, res) => {
-  const { forceResetScraper } = await import("./scraper");
-  await forceResetScraper();
-  res.json({ message: "Scraper reset" });
+  try {
+    const { forceResetScraper } = await import("./scraper");
+    await forceResetScraper();
+    res.json({ message: "Scraper reset" });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to reset scraper", details: err.message });
+  }
 });
 
 app.post("/api/checkout", express.json(), async (req, res) => {
@@ -113,8 +127,10 @@ if (!process.env.VERCEL) {
   setupFrontend();
   
   // Start background scrape
-  scrapeAllPages();
-  setInterval(scrapeAllPages, 30 * 60 * 1000);
+  import("./scraper").then(({ scrapeAllPages }) => {
+    scrapeAllPages();
+    setInterval(scrapeAllPages, 30 * 60 * 1000);
+  });
 }
 
 export default app;
