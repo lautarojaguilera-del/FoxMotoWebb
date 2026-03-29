@@ -5,14 +5,14 @@
       "description": "A motorcycle part or accessory",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique identifier from Dux Software" },
-        "name": { "type": "string", "description": "Name of the product" },
-        "price": { "type": "number", "description": "Current price in ARS" },
-        "image": { "type": "string", "description": "URL to the product image" },
-        "category": { "type": "string", "description": "Product category" },
+        "sku": { "type": "string", "description": "Unique identifier (SKU)" },
+        "title": { "type": "string", "description": "Name of the product" },
+        "price": { "type": "string", "description": "Price string (e.g. $1.234,56)" },
+        "stock": { "type": "string", "description": "Stock status string" },
+        "img": { "type": "string", "description": "URL to the product image" },
         "last_updated": { "type": "string", "format": "date-time", "description": "When the product was last scraped" }
       },
-      "required": ["id", "name", "price"]
+      "required": ["sku", "title", "price"]
     },
     "ScrapeStatus": {
       "title": "ScrapeStatus",
