@@ -6,6 +6,9 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 export const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Middleware
+app.use(express.json());
+
 // Register API routes synchronously to avoid race conditions on Vercel
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -51,12 +54,13 @@ app.post("/api/scrape/reset", async (req, res) => {
   }
 });
 
-app.post("/api/checkout", express.json(), async (req, res) => {
+app.post("/api/checkout", async (req, res) => {
   const { items, customer } = req.body;
   
   console.log("Checkout request received:", { 
     itemCount: items?.length, 
     customerEmail: customer?.email,
+    bodyKeys: Object.keys(req.body || {}),
     env: process.env.NODE_ENV,
     isVercel: !!process.env.VERCEL
   });
@@ -71,8 +75,12 @@ app.post("/api/checkout", express.json(), async (req, res) => {
   try {
     // Record order in Firestore
     const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    console.log("Attempting to record order:", orderId);
+    console.log("Attempting to record order in Firestore:", orderId);
     
+    if (!db) {
+      throw new Error("Firestore database instance (db) is not initialized");
+    }
+
     await setDoc(doc(db, 'orders', orderId), {
       items,
       customer,
@@ -80,7 +88,7 @@ app.post("/api/checkout", express.json(), async (req, res) => {
       createdAt: serverTimestamp()
     });
 
-    console.log("Order recorded successfully:", orderId);
+    console.log("Order recorded successfully in Firestore:", orderId);
     res.json({ 
       success: true, 
       message: "Order recorded successfully",
@@ -90,12 +98,14 @@ app.post("/api/checkout", express.json(), async (req, res) => {
     console.error("Checkout error details:", {
       message: error.message,
       code: error.code,
-      stack: error.stack
+      stack: error.stack,
+      dbInitialized: !!db
     });
     res.status(500).json({ 
       error: "Checkout failed", 
       details: error.message,
-      code: error.code 
+      code: error.code,
+      dbInitialized: !!db
     });
   }
 });
