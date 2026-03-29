@@ -1,0 +1,39 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A motorcycle part or accessory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier from Dux Software" },
+        "name": { "type": "string", "description": "Name of the product" },
+        "price": { "type": "number", "description": "Current price in ARS" },
+        "image": { "type": "string", "description": "URL to the product image" },
+        "category": { "type": "string", "description": "Product category" },
+        "last_updated": { "type": "string", "format": "date-time", "description": "When the product was last scraped" }
+      },
+      "required": ["id", "name", "price"]
+    },
+    "ScrapeStatus": {
+      "title": "ScrapeStatus",
+      "description": "Current status of the scraping process",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["idle", "scraping", "error"] },
+        "current_page": { "type": "number" },
+        "total_products": { "type": "number" },
+        "last_run": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Collection of all scraped products"
+    },
+    "/status/current": {
+      "schema": "ScrapeStatus",
+      "description": "Current scraping status"
+    }
+  }
+}
