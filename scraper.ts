@@ -37,9 +37,9 @@ async function updateScrapeStatus(status: any) {
 async function getBrowser() {
   if (process.env.VERCEL) {
     const chromiumModule = await import("@sparticuz/chromium");
-    const chromium = chromiumModule.default || chromiumModule;
+    const chromium: any = chromiumModule.default || chromiumModule;
     const puppeteerModule = await import("puppeteer-core");
-    const puppeteer = puppeteerModule.default || puppeteerModule;
+    const puppeteer: any = puppeteerModule.default || puppeteerModule;
     
     return await puppeteer.launch({
       args: chromium.args,

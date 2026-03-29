@@ -103,6 +103,10 @@ export default function Checkout({
       const message = `hola fox te envio los datos de mi pedido\n\n*Carrito:*\n${text}\n\n*Monto Total: ${totalStr}*\n\n*Datos de contacto:*\nNombre: ${customerForm.name} ${customerForm.lastname}\nDNI/CUIT: ${customerForm.idNumber}\nEmail: ${customerForm.email}\nTeléfono: ${customerForm.phone}\nDirección: ${customerForm.street} ${customerForm.streetNumber}\nCódigo Postal: ${customerForm.zipCode}`;
       
       window.open(`https://wa.me/5492915221351?text=${encodeURIComponent(message)}`, '_blank');
+      
+      toast.success('¡Pedido enviado con éxito!', {
+        description: 'Te enviamos un correo de confirmación y te contactaremos por WhatsApp.'
+      });
 
       // Track Purchase Event
       try {

@@ -1,7 +1,9 @@
 import express from "express";
 import path from "path";
+import nodemailer from "nodemailer";
+import { automateDuxCheckout } from "./duxAutomation";
 import { db } from "./src/firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, collection, addDoc } from "firebase/firestore";
 
 export const app = express();
 const PORT = process.env.PORT || 3000;
@@ -89,6 +91,130 @@ app.post("/api/checkout", async (req, res) => {
     });
 
     console.log("Order recorded successfully in Firestore:", orderId);
+
+    // 1. Send email via Nodemailer (if configured)
+    const sendEmail = async () => {
+      const { EMAIL_USER, EMAIL_PASS, EMAIL_TO } = process.env;
+      
+      if (!EMAIL_USER || !EMAIL_PASS || !EMAIL_TO) {
+        console.warn("Email credentials missing (EMAIL_USER, EMAIL_PASS, EMAIL_TO). Skipping direct email.");
+        return;
+      }
+
+      try {
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+            user: EMAIL_USER,
+            pass: EMAIL_PASS
+          }
+        });
+
+        const itemsHtml = items.map((item: any) => `
+          <tr>
+            <td>${item.title}</td>
+            <td>${item.quantity}</td>
+            <td>${item.price}</td>
+          </tr>
+        `).join('');
+
+        const mailOptions = {
+          from: `"Fox Motorepuestos" <${EMAIL_USER}>`,
+          to: EMAIL_TO,
+          subject: `Nuevo Pedido #${orderId}`,
+          html: `
+            <h1>Nuevo Pedido Recibido</h1>
+            <p><strong>ID de Pedido:</strong> ${orderId}</p>
+            <h3>Datos del Cliente:</h3>
+            <ul>
+              <li><strong>Nombre:</strong> ${customer.name} ${customer.lastname}</li>
+              <li><strong>Email:</strong> ${customer.email}</li>
+              <li><strong>Teléfono:</strong> ${customer.phone}</li>
+              <li><strong>Dirección:</strong> ${customer.street} ${customer.streetNumber}, ${customer.zipCode}</li>
+            </ul>
+            <h3>Productos:</h3>
+            <table border="1" cellpadding="5" style="border-collapse: collapse;">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Cantidad</th>
+                  <th>Precio</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+          `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log("Email sent successfully via Nodemailer");
+      } catch (mailErr) {
+        console.error("Error sending email via Nodemailer:", mailErr);
+      }
+    };
+
+    // 2. Write to 'mail' collection (for Firebase Trigger Email extension)
+    const triggerFirebaseEmail = async () => {
+      try {
+        const { EMAIL_TO } = process.env;
+        if (!EMAIL_TO) return;
+
+        await addDoc(collection(db, 'mail'), {
+          to: EMAIL_TO,
+          message: {
+            subject: `Nuevo Pedido #${orderId}`,
+            html: `Nuevo pedido de ${customer.name} ${customer.lastname}. ID: ${orderId}`,
+          },
+          orderId: orderId,
+          createdAt: serverTimestamp()
+        });
+        console.log("Trigger Email document added to Firestore");
+      } catch (fireErr) {
+        console.error("Error adding Trigger Email document:", fireErr);
+      }
+    };
+
+    // Run both in background
+    sendEmail();
+    triggerFirebaseEmail();
+
+    // 3. Automate Dux Checkout
+    const runDuxAutomation = async () => {
+      try {
+        const orderData = {
+          items: items.map((item: any) => ({
+            sku: item.product.sku,
+            quantity: item.quantity
+          })),
+          customer: {
+            email: customer.email,
+            name: customer.name,
+            lastname: customer.lastname,
+            phone: customer.phone,
+            idNumber: customer.idNumber,
+            street: customer.street,
+            streetNumber: customer.streetNumber,
+            zipCode: customer.zipCode,
+            city: customer.city,
+            province: customer.province
+          }
+        };
+
+        const result = await automateDuxCheckout(orderData);
+        if (result.success) {
+          console.log("Dux Automation completed successfully");
+        } else {
+          console.error("Dux Automation failed:", result.error);
+        }
+      } catch (duxErr: any) {
+        console.error("Error in Dux Automation:", duxErr.message);
+      }
+    };
+
+    runDuxAutomation();
+
     res.json({ 
       success: true, 
       message: "Order recorded successfully",

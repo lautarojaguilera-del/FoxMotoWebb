@@ -50,6 +50,10 @@
     "/orders/{orderId}": {
       "schema": "Order",
       "description": "Collection of all customer orders"
+    },
+    "/mail/{mailId}": {
+      "schema": "object",
+      "description": "Collection for Firebase Trigger Email extension"
     }
   }
 }
