@@ -119,6 +119,36 @@ export default function Catalog({
     return parseFloat(cleaned) || 0;
   };
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleManualSync = async () => {
+    if (isSyncing || progress.status === 'syncing') return;
+    
+    setIsSyncing(true);
+    const id = toast.loading('Iniciando sincronización...');
+    
+    try {
+      const response = await fetch('/api/scrape/start', { method: 'POST' });
+      if (!response.ok) throw new Error('Error al iniciar');
+      toast.success('Sincronización iniciada', { id });
+    } catch (err) {
+      toast.error('No se pudo iniciar la sincronización', { id });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleForceReset = async () => {
+    const id = toast.loading('Reiniciando sincronizador...');
+    try {
+      const response = await fetch('/api/scrape/reset', { method: 'POST' });
+      if (!response.ok) throw new Error('Error al reiniciar');
+      toast.success('Sincronizador reiniciado', { id });
+    } catch (err) {
+      toast.error('No se pudo reiniciar el sincronizador', { id });
+    }
+  };
+
   const { availableCategories, availableBrands, filteredProducts } = useMemo(() => {
     // Extract categories and brands from current products
     const cats = new Set<string>();
@@ -251,6 +281,14 @@ export default function Catalog({
               >
                 <Filter size={20} />
               </button>
+              <button 
+                onClick={handleManualSync}
+                disabled={isSyncing || progress.status === 'syncing'}
+                className={`p-2 border border-[#333] rounded-lg transition-all flex items-center justify-center bg-[#111] text-gray-400 hover:bg-[#222] hover:text-[#FF4500] disabled:opacity-50 disabled:cursor-not-allowed`}
+                title="Sincronizar Catálogo"
+              >
+                <RefreshCw size={20} className={isSyncing || progress.status === 'syncing' ? 'animate-spin' : ''} />
+              </button>
             </div>
             <button 
               onClick={() => setIsCartOpen(true)}
@@ -283,6 +321,13 @@ export default function Catalog({
             className={`p-2 border border-[#333] rounded-lg transition-colors flex items-center justify-center ${isFilterOpen ? 'bg-[#FF4500]/10 text-[#FF4500] border-[#FF4500]/30' : 'bg-[#111] text-gray-400 hover:bg-[#222]'}`}
           >
             <Filter size={20} />
+          </button>
+          <button 
+            onClick={handleManualSync}
+            disabled={isSyncing || progress.status === 'syncing'}
+            className={`p-2 border border-[#333] rounded-lg transition-all flex items-center justify-center bg-[#111] text-gray-400 hover:bg-[#222] hover:text-[#FF4500] disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            <RefreshCw size={20} className={isSyncing || progress.status === 'syncing' ? 'animate-spin' : ''} />
           </button>
         </div>
       </header>
@@ -369,9 +414,32 @@ export default function Catalog({
                 ></div>
               </div>
             </div>
-            <span className="text-xs font-bold bg-blue-900/40 px-2 py-1 rounded-full">
-              {progress.total_products} items
-            </span>
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-xs font-bold bg-blue-900/40 px-2 py-1 rounded-full">
+                {progress.total_products} items
+              </span>
+              <button 
+                onClick={handleForceReset}
+                className="text-[10px] text-blue-500 hover:underline"
+              >
+                Reiniciar si se trabó
+              </button>
+            </div>
+          </div>
+        )}
+
+        {progress.status === 'error' && (
+          <div className="mb-6 bg-red-900/20 border border-red-800/50 rounded-xl p-4 flex items-center gap-3 text-red-400 shadow-sm">
+            <AlertCircle size={20} />
+            <div className="flex-1">
+              <p className="font-medium text-sm">Error en la última sincronización</p>
+            </div>
+            <button 
+              onClick={handleForceReset}
+              className="text-xs font-bold bg-red-900/40 px-3 py-1 rounded-lg hover:bg-red-800/50 transition-colors"
+            >
+              Reiniciar Estado
+            </button>
           </div>
         )}
 

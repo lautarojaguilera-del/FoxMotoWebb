@@ -20,6 +20,23 @@ app.get("/api/products", (req, res) => {
   });
 });
 
+app.post("/api/scrape/start", async (req, res) => {
+  if (scrapeProgress.isScraping) {
+    return res.status(400).json({ error: "Scrape already in progress" });
+  }
+  
+  // Trigger in background
+  scrapeAllPages().catch(err => console.error("Manual scrape error:", err));
+  
+  res.json({ message: "Scrape started" });
+});
+
+app.post("/api/scrape/reset", async (req, res) => {
+  const { forceResetScraper } = await import("./scraper");
+  await forceResetScraper();
+  res.json({ message: "Scraper reset" });
+});
+
 app.post("/api/checkout", express.json(), async (req, res) => {
   const { items, customer } = req.body;
   

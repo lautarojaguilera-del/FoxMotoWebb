@@ -20,8 +20,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 export let cachedProducts: any[] = [];
-export let isScraping = false;
-export let scrapeProgress = { current_page: 0, total_products: 0, status: 'idle' };
+export let scrapeProgress = { current_page: 0, total_products: 0, status: 'idle', isScraping: false };
 
 async function updateScrapeStatus(status: any) {
   try {
@@ -44,8 +43,8 @@ async function getBrowser() {
 }
 
 export async function scrapeAllPages() {
-  if (isScraping) return;
-  isScraping = true;
+  if (scrapeProgress.isScraping) return;
+  scrapeProgress.isScraping = true;
   scrapeProgress.status = 'syncing';
   scrapeProgress.current_page = 1;
   console.log("Starting full catalog scrape...");
@@ -155,6 +154,13 @@ export async function scrapeAllPages() {
     await updateScrapeStatus(scrapeProgress);
   } finally {
     if (browser) await browser.close();
-    isScraping = false;
+    scrapeProgress.isScraping = false;
   }
+}
+
+export async function forceResetScraper() {
+  scrapeProgress.isScraping = false;
+  scrapeProgress.status = 'idle';
+  scrapeProgress.current_page = 0;
+  await updateScrapeStatus(scrapeProgress);
 }
