@@ -89,7 +89,8 @@ export default function Checkout({
       });
       
       if (!response.ok) {
-        throw new Error('Error en el checkout automatizado');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || errorData.error || 'Error en el checkout automatizado');
       }
       
       const text = cart.map((item: any) => `${item.quantity}x ${item.product.title} (${item.product.sku}) - ${item.product.price}`).join('\n');

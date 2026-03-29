@@ -7,6 +7,68 @@ import { collection, doc, setDoc, getDocs, writeBatch, serverTimestamp } from "f
 export const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Register API routes synchronously to avoid race conditions on Vercel
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.get("/api/products", (req, res) => {
+  res.json({
+    status: scrapeProgress.status,
+    progress: scrapeProgress,
+    products: cachedProducts
+  });
+});
+
+app.post("/api/checkout", express.json(), async (req, res) => {
+  const { items, customer } = req.body;
+  
+  console.log("Checkout request received:", { 
+    itemCount: items?.length, 
+    customerEmail: customer?.email,
+    env: process.env.NODE_ENV,
+    isVercel: !!process.env.VERCEL
+  });
+
+  if (!items || items.length === 0) {
+    return res.status(400).json({ error: "Cart is empty" });
+  }
+  if (!customer) {
+    return res.status(400).json({ error: "Customer details missing" });
+  }
+
+  try {
+    // Record order in Firestore
+    const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    console.log("Attempting to record order:", orderId);
+    
+    await setDoc(doc(db, 'orders', orderId), {
+      items,
+      customer,
+      status: 'pending',
+      createdAt: serverTimestamp()
+    });
+
+    console.log("Order recorded successfully:", orderId);
+    res.json({ 
+      success: true, 
+      message: "Order recorded successfully",
+      orderId
+    });
+  } catch (error: any) {
+    console.error("Checkout error details:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: "Checkout failed", 
+      details: error.message,
+      code: error.code 
+    });
+  }
+});
+
 enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -166,89 +228,34 @@ async function scrapeAllPages() {
   }
 }
 
-// Start initial scrape in the background (skip on Vercel)
+// Start server for local development and AI Studio
 if (!process.env.VERCEL) {
-  scrapeAllPages();
-  // Schedule every 30 minutes
-  setInterval(scrapeAllPages, 30 * 60 * 1000);
-}
-
-async function startServer() {
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
-  });
-
-  app.get("/api/products", (req, res) => {
-    res.json({
-      status: scrapeProgress.status,
-      progress: scrapeProgress,
-      products: cachedProducts
-    });
-  });
-
-  app.post("/api/checkout", express.json(), async (req, res) => {
-    const { items, customer } = req.body;
-    
-    if (!items || items.length === 0) {
-      return res.status(400).json({ error: "Cart is empty" });
-    }
-    if (!customer) {
-      return res.status(400).json({ error: "Customer details missing" });
-    }
-
-    console.log("Processing order for:", customer.email);
-    
-    try {
-      // Record order in Firestore
-      const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      await setDoc(doc(db, 'orders', orderId), {
-        items,
-        customer,
-        status: 'pending',
-        createdAt: serverTimestamp()
+  // Register frontend middleware for local dev
+  const setupFrontend = async () => {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
       });
-
-      // Optional: Update stock in Firestore if needed
-      // For now, we just return success as the frontend handles the WhatsApp redirect
-      
-      res.json({ 
-        success: true, 
-        message: "Order recorded successfully",
-        orderId
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
       });
-    } catch (error: any) {
-      console.error("Checkout error:", error);
-      res.status(500).json({ error: error.message || "Checkout failed" });
     }
-  });
-
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
-
-  if (!process.env.VERCEL) {
+    
     app.listen(PORT as number, "0.0.0.0", () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
-  }
-}
-
-// Start server for local development and AI Studio
-if (!process.env.VERCEL) {
-  startServer();
-} else {
-  // On Vercel, we still need to run the setup logic (like routes) but not listen
-  startServer();
+  };
+  
+  setupFrontend();
+  
+  // Start background scrape
+  scrapeAllPages();
+  setInterval(scrapeAllPages, 30 * 60 * 1000);
 }
 
 export default app;
