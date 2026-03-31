@@ -1,7 +1,8 @@
 import express from "express";
 import path from "path";
 import { db } from "./src/firebase";
-import { doc, setDoc, serverTimestamp, collection, addDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, collection, addDoc, getDocs, getDoc } from "firebase/firestore";
+import * as scraper from "./scraper";
 
 export const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,8 +28,7 @@ app.post("/api/checkout", async (req, res) => {
   console.log("Starting automated checkout process...");
   
   try {
-    const { getBrowser } = await import("./scraper");
-    const browser = await getBrowser();
+    const browser = await scraper.getBrowser();
     const page = await browser.newPage();
     
     // 1. Go to the store
@@ -193,7 +193,6 @@ app.post("/api/checkout", async (req, res) => {
 
 app.get("/api/products", async (req, res) => {
   try {
-    const scraper = await import("./scraper");
     const status = await scraper.getLatestScrapeStatus();
     
     // On Vercel or after cold start, cachedProducts might be empty.
@@ -202,7 +201,6 @@ app.get("/api/products", async (req, res) => {
     
     if (products.length === 0) {
       console.log("Cache empty, fetching products from Firestore...");
-      const { getDocs, collection } = await import("firebase/firestore");
       const querySnapshot = await getDocs(collection(db, "products"));
       products = querySnapshot.docs.map(doc => doc.data());
       console.log(`Fetched ${products.length} products from Firestore.`);
@@ -225,13 +223,12 @@ app.get("/api/products", async (req, res) => {
 
 app.post("/api/scrape/start", async (req, res) => {
   try {
-    const { scrapeAllPages, scrapeProgress } = await import("./scraper");
-    if (scrapeProgress.isScraping) {
+    if (scraper.scrapeProgress.isScraping) {
       return res.status(400).json({ error: "Scrape already in progress" });
     }
     
     // Trigger in background
-    scrapeAllPages().catch(err => console.error("Manual scrape error:", err));
+    scraper.scrapeAllPages().catch(err => console.error("Manual scrape error:", err));
     
     res.json({ message: "Scrape started" });
   } catch (err: any) {
@@ -242,8 +239,7 @@ app.post("/api/scrape/start", async (req, res) => {
 
 app.post("/api/scrape/reset", async (req, res) => {
   try {
-    const { forceResetScraper } = await import("./scraper");
-    await forceResetScraper();
+    await scraper.forceResetScraper();
     res.json({ message: "Scraper reset" });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to reset scraper", details: err.message });
@@ -279,10 +275,8 @@ if (!process.env.VERCEL) {
   setupFrontend();
   
   // Start background scrape
-  import("./scraper").then(({ scrapeAllPages }) => {
-    scrapeAllPages();
-    setInterval(scrapeAllPages, 30 * 60 * 1000);
-  });
+  scraper.scrapeAllPages();
+  setInterval(scraper.scrapeAllPages, 30 * 60 * 1000);
 }
 
 export default app;
