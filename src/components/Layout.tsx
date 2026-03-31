@@ -1,9 +1,8 @@
 import { Outlet, Link } from 'react-router-dom';
-import { MapPin, Phone, Instagram, Facebook, ShoppingCart } from 'lucide-react';
+import { MapPin, Phone, Instagram, Facebook } from 'lucide-react';
 import Map from './Map';
 
-export default function Layout({ cart = [], setIsCartOpen }: { cart?: any[], setIsCartOpen?: (o: boolean) => void }) {
-  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+export default function Layout() {
   const trackEvent = (eventName: string) => {
     try {
       if (typeof (window as any).gtag === 'function') {
@@ -34,18 +33,6 @@ export default function Layout({ cart = [], setIsCartOpen }: { cart?: any[], set
             <Link to="/" className="hover:text-[#FF4500] transition-colors uppercase neon-text-shadow">Inicio</Link>
             <Link to="/catalogo" onClick={() => trackEvent('ViewCatalog')} className="hover:text-[#FF4500] transition-colors uppercase neon-text-shadow">Catálogo</Link>
             <a href="#contacto" className="hover:text-[#FF4500] transition-colors uppercase neon-text-shadow">Contacto</a>
-          </div>
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsCartOpen?.(true)}
-              className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-white hover:bg-white/10 transition-all font-black uppercase tracking-widest text-xs group"
-            >
-              <ShoppingCart size={18} className="text-[#ff4d00] group-hover:scale-110 transition-transform" />
-              <span className="hidden sm:inline">Carrito</span>
-              <span className="bg-[#ff4d00] text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] leading-none">
-                {cartCount}
-              </span>
-            </button>
           </div>
         </div>
       </nav>
