@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { db } from "./src/firebase";
 import { doc, setDoc, serverTimestamp, collection, addDoc, writeBatch, increment } from "firebase/firestore";
+import { scrapeProgress, cachedProducts, scrapeAllPages, forceResetScraper, getBrowser } from "./scraper";
 
 export const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,7 +28,6 @@ app.post("/api/checkout", async (req, res) => {
   console.log("Starting automated checkout process...");
   
   try {
-    const { getBrowser } = await import("./scraper");
     const browser = await getBrowser();
     const page = await browser.newPage();
     
@@ -211,7 +211,6 @@ app.post("/api/checkout", async (req, res) => {
 
 app.get("/api/products", async (req, res) => {
   try {
-    const { scrapeProgress, cachedProducts } = await import("./scraper");
     res.json({
       status: scrapeProgress.status,
       progress: scrapeProgress,
@@ -224,7 +223,6 @@ app.get("/api/products", async (req, res) => {
 
 app.post("/api/scrape/start", async (req, res) => {
   try {
-    const { scrapeAllPages, scrapeProgress } = await import("./scraper");
     if (scrapeProgress.isScraping) {
       return res.status(400).json({ error: "Scrape already in progress" });
     }
@@ -241,7 +239,6 @@ app.post("/api/scrape/start", async (req, res) => {
 
 app.post("/api/scrape/reset", async (req, res) => {
   try {
-    const { forceResetScraper } = await import("./scraper");
     await forceResetScraper();
     res.json({ message: "Scraper reset" });
   } catch (err: any) {
@@ -278,10 +275,8 @@ if (!process.env.VERCEL) {
   setupFrontend();
   
   // Start background scrape
-  import("./scraper").then(({ scrapeAllPages }) => {
-    scrapeAllPages();
-    setInterval(scrapeAllPages, 30 * 60 * 1000);
-  });
+  scrapeAllPages();
+  setInterval(scrapeAllPages, 30 * 60 * 1000);
 }
 
 export default app;
