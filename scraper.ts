@@ -19,8 +19,16 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   console.error('Firestore Error: ', JSON.stringify(errInfo));
 }
 
-export let cachedProducts: any[] = [];
-export let scrapeProgress = { current_page: 0, total_products: 0, status: 'idle', isScraping: false };
+let cachedProducts: any[] = [];
+let scrapeProgress = { current_page: 0, total_products: 0, status: 'idle', isScraping: false };
+
+export function getCachedProducts() {
+  return cachedProducts;
+}
+
+export function getScrapeProgress() {
+  return scrapeProgress;
+}
 
 async function updateScrapeStatus(status: any) {
   try {

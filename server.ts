@@ -197,7 +197,7 @@ app.get("/api/products", async (req, res) => {
     
     // On Vercel or after cold start, cachedProducts might be empty.
     // In that case, we fetch from Firestore.
-    let products = scraper.cachedProducts;
+    let products = scraper.getCachedProducts();
     
     if (products.length === 0) {
       console.log("Cache empty, fetching products from Firestore...");
@@ -223,7 +223,7 @@ app.get("/api/products", async (req, res) => {
 
 app.post("/api/scrape/start", async (req, res) => {
   try {
-    if (scraper.scrapeProgress.isScraping) {
+    if (scraper.getScrapeProgress().isScraping) {
       return res.status(400).json({ error: "Scrape already in progress" });
     }
     
@@ -275,8 +275,14 @@ if (!process.env.VERCEL) {
   setupFrontend();
   
   // Start background scrape
-  scraper.scrapeAllPages();
-  setInterval(scraper.scrapeAllPages, 30 * 60 * 1000);
+  console.log("Starting background scrape...");
+  scraper.scrapeAllPages().catch(err => {
+    console.error("Background scrape failed to start:", err);
+  });
+  setInterval(() => {
+    console.log("Running scheduled scrape...");
+    scraper.scrapeAllPages().catch(err => console.error("Scheduled scrape error:", err));
+  }, 30 * 60 * 1000);
 }
 
 export default app;
