@@ -1,5 +1,5 @@
 import { db } from "./src/firebase";
-import { doc, setDoc, writeBatch, serverTimestamp, query, collection, getDocs } from "firebase/firestore";
+import { doc, setDoc, writeBatch, serverTimestamp } from "firebase/firestore";
 
 enum OperationType {
   CREATE = 'create',
@@ -21,26 +21,6 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 
 export let cachedProducts: any[] = [];
 export let scrapeProgress = { current_page: 0, total_products: 0, status: 'idle', isScraping: false };
-
-let isInitialized = false;
-
-// Initialize cachedProducts from Firestore
-export const initCache = async () => {
-  if (isInitialized) return;
-  try {
-    console.log("Initializing product cache from Firestore...");
-    const q = query(collection(db, 'products'));
-    const snapshot = await getDocs(q);
-    cachedProducts = snapshot.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
-    isInitialized = true;
-    console.log(`Cache initialized with ${cachedProducts.length} products from Firestore.`);
-  } catch (err) {
-    console.error("Failed to initialize product cache:", err);
-  }
-};
-
-// Call initCache but don't let it block module loading
-initCache().catch(err => console.error("Top-level initCache error:", err));
 
 async function updateScrapeStatus(status: any) {
   try {
@@ -156,21 +136,15 @@ export async function scrapeAllPages() {
       // Save to Firestore in batches
       try {
         const batch = writeBatch(db);
-        for (const p of pageProducts) {
+        pageProducts.forEach((p: any) => {
           if (p && p.sku) {
             const productRef = doc(db, 'products', p.sku);
-            // We use set with merge: true to avoid overwriting salesCount and firstSeenAt
-            // However, we need to ensure firstSeenAt is only set once.
-            // Since we can't easily check existence in a batch without reads, 
-            // we'll just set last_updated and the basic info.
-            // The frontend will handle "New" logic based on last_updated vs firstSeenAt if we had it,
-            // but for now let's just ensure we don't wipe salesCount.
             batch.set(productRef, {
               ...p,
               last_updated: serverTimestamp()
-            }, { merge: true });
+            });
           }
-        }
+        });
         await batch.commit();
         console.log(`Saved ${pageProducts.length} products to Firestore batch.`);
       } catch (error) {

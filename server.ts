@@ -1,8 +1,7 @@
 import express from "express";
 import path from "path";
 import { db } from "./src/firebase";
-import { doc, setDoc, serverTimestamp, collection, addDoc, writeBatch, increment } from "firebase/firestore";
-import { scrapeProgress, cachedProducts, scrapeAllPages, forceResetScraper, getBrowser } from "./scraper";
+import { doc, setDoc, serverTimestamp, collection, addDoc } from "firebase/firestore";
 
 export const app = express();
 const PORT = process.env.PORT || 3000;
@@ -28,6 +27,7 @@ app.post("/api/checkout", async (req, res) => {
   console.log("Starting automated checkout process...");
   
   try {
+    const { getBrowser } = await import("./scraper");
     const browser = await getBrowser();
     const page = await browser.newPage();
     
@@ -180,24 +180,6 @@ app.post("/api/checkout", async (req, res) => {
     
     await browser.close();
     
-    if (orderDetails.success) {
-      try {
-        const batch = writeBatch(db);
-        for (const item of items) {
-          const productRef = doc(db, 'products', item.product.sku);
-          // We use increment to track sales
-          batch.update(productRef, {
-            salesCount: increment(item.quantity)
-          });
-        }
-        await batch.commit();
-        console.log("Sales counts updated in Firestore.");
-      } catch (err) {
-        console.error("Failed to update sales counts:", err);
-        // We don't fail the whole request if this fails
-      }
-    }
-    
     res.json({ 
       success: true, 
       message: "Checkout automated successfully!",
@@ -210,40 +192,21 @@ app.post("/api/checkout", async (req, res) => {
 });
 
 app.get("/api/products", async (req, res) => {
-  console.log("GET /api/products called");
   try {
-    // If cache is empty, try to fetch from Firestore directly
-    let products = cachedProducts;
-    if (!products || products.length === 0) {
-      console.log("Cache empty, fetching from Firestore...");
-      try {
-        const { query, collection, getDocs } = await import("firebase/firestore");
-        const q = query(collection(db, 'products'));
-        const snapshot = await getDocs(q);
-        products = snapshot.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
-        console.log(`Fetched ${products.length} products directly from Firestore`);
-      } catch (firestoreErr: any) {
-        console.error("Direct Firestore fetch failed:", firestoreErr);
-      }
-    }
-
+    const { scrapeProgress, cachedProducts } = await import("./scraper");
     res.json({
-      status: scrapeProgress?.status || 'idle',
-      progress: scrapeProgress || { current_page: 0, total_products: 0, status: 'idle', isScraping: false },
-      products: products || []
+      status: scrapeProgress.status,
+      progress: scrapeProgress,
+      products: cachedProducts
     });
   } catch (err: any) {
-    console.error("API /api/products error:", err);
-    res.status(500).json({ 
-      error: "Failed to fetch products", 
-      details: err.message,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
+    res.status(500).json({ error: "Failed to fetch products", details: err.message });
   }
 });
 
 app.post("/api/scrape/start", async (req, res) => {
   try {
+    const { scrapeAllPages, scrapeProgress } = await import("./scraper");
     if (scrapeProgress.isScraping) {
       return res.status(400).json({ error: "Scrape already in progress" });
     }
@@ -260,6 +223,7 @@ app.post("/api/scrape/start", async (req, res) => {
 
 app.post("/api/scrape/reset", async (req, res) => {
   try {
+    const { forceResetScraper } = await import("./scraper");
     await forceResetScraper();
     res.json({ message: "Scraper reset" });
   } catch (err: any) {
@@ -296,18 +260,10 @@ if (!process.env.VERCEL) {
   setupFrontend();
   
   // Start background scrape
-  scrapeAllPages();
-  setInterval(scrapeAllPages, 30 * 60 * 1000);
-}
-
-// Global error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error("Unhandled error:", err);
-  res.status(500).json({ 
-    error: "Internal Server Error", 
-    details: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  import("./scraper").then(({ scrapeAllPages }) => {
+    scrapeAllPages();
+    setInterval(scrapeAllPages, 30 * 60 * 1000);
   });
-});
+}
 
 export default app;

@@ -110,39 +110,13 @@ function ProductDetailView({ products, cartTotal, addToCart, setIsCartOpen }: {
         <div className="max-w-6xl mx-auto space-y-12">
           <div className="bg-[#121212] rounded-3xl shadow-2xl border border-white/5 overflow-hidden flex flex-col md:flex-row">
             {/* Image Section */}
-            <div className="md:w-1/2 p-8 flex flex-col gap-4 bg-white m-4 rounded-2xl relative group/zoom overflow-hidden">
-              <div 
-                className="aspect-square flex items-center justify-center p-8 cursor-zoom-in"
-                onMouseMove={(e) => {
-                  const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
-                  const x = ((e.clientX - left) / width) * 100;
-                  const y = ((e.clientY - top) / height) * 100;
-                  const img = e.currentTarget.querySelector('img');
-                  if (img) {
-                    img.style.transformOrigin = `${x}% ${y}%`;
-                    img.style.transform = 'scale(2.5)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  const img = e.currentTarget.querySelector('img');
-                  if (img) {
-                    img.style.transform = 'scale(1)';
-                  }
-                }}
-              >
+            <div className="md:w-1/2 p-8 flex flex-col gap-4 bg-white m-4 rounded-2xl">
+              <div className="aspect-square flex items-center justify-center p-8">
                 {product.img && !product.img.includes('no-product-image') ? (
-                  <img 
-                    src={product.img} 
-                    alt={product.title} 
-                    className="object-contain max-h-full max-w-full transition-transform duration-200 ease-out" 
-                    referrerPolicy="no-referrer" 
-                  />
+                  <img src={product.img} alt={product.title} className="object-contain max-h-full max-w-full" referrerPolicy="no-referrer" />
                 ) : (
                   <Package size={120} className="text-gray-100" />
                 )}
-              </div>
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white text-[10px] font-bold px-3 py-1 rounded-full opacity-0 group-hover/zoom:opacity-100 transition-opacity pointer-events-none">
-                Pasa el mouse para hacer zoom
               </div>
             </div>
 
@@ -238,8 +212,6 @@ interface Product {
   price: string;
   stock: string;
   img: string | null;
-  salesCount?: number;
-  last_updated?: any;
 }
 
 interface SyncProgress {
@@ -296,41 +268,6 @@ export default function App({
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<'relevance' | 'price-asc' | 'price-desc' | 'name-asc' | 'name-desc'>('relevance');
   const navigate = useNavigate();
-
-  const getStockNumber = (stock: string): number => {
-    if (stock.toLowerCase().includes('ilimitado')) return 999;
-    const match = stock.match(/\d+/);
-    return match ? parseInt(match[0]) : 0;
-  };
-
-  const getStatusBadge = (product: Product) => {
-    const badges = [];
-    
-    // Handle Firestore timestamp (could be { _seconds, _nanoseconds } or Date)
-    const lastUpdated = product.last_updated;
-    let lastUpdatedTime = 0;
-    if (lastUpdated) {
-      if (lastUpdated.toDate) {
-        lastUpdatedTime = lastUpdated.toDate().getTime();
-      } else if (lastUpdated._seconds) {
-        lastUpdatedTime = lastUpdated._seconds * 1000;
-      } else {
-        lastUpdatedTime = new Date(lastUpdated).getTime();
-      }
-    }
-
-    const isNew = lastUpdatedTime > 0 && (new Date().getTime() - lastUpdatedTime < 48 * 60 * 60 * 1000) && (product.salesCount || 0) === 0;
-    const isBestSeller = (product.salesCount || 0) > 0;
-    const stockNum = getStockNumber(product.stock);
-    const isLowStock = stockNum > 0 && stockNum < 5;
-
-    if (isNew) badges.push({ text: 'Nuevo Ingreso', color: 'bg-blue-500' });
-    if (isBestSeller) badges.push({ text: 'Más Vendido', color: 'bg-[#ff4d00]' });
-    if (isLowStock) badges.push({ text: 'Últimas Unidades', color: 'bg-red-500' });
-    if (parsePrice(product.price) > 10000) badges.push({ text: 'Envío Gratis', color: 'bg-white text-black border border-black/10' });
-
-    return badges;
-  };
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -344,20 +281,17 @@ export default function App({
 
   const fetchProducts = () => {
     fetch('/api/products')
-      .then(async res => {
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.details || data.error || 'Failed to fetch products');
-        }
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch products');
         return res.json();
       })
       .then(data => {
-        setProducts(data.products || []);
-        setProgress(data.progress || { current_page: 0, total_products: 0, status: 'idle' });
+        setProducts(data.products);
+        setProgress(data.progress);
         setLoading(false);
       })
       .catch(err => {
-        console.error("Fetch products error:", err);
+        console.error(err);
         setError(err.message);
         setLoading(false);
       });
@@ -457,7 +391,7 @@ export default function App({
                   <p className="text-white/40 mt-1 font-medium">Encuentra todo lo que necesitas para tu moto.</p>
                 </div>
                 <div className="flex flex-col sm:flex-row items-center gap-4">
-                  <div className="relative w-full sm:w-auto group/search">
+                  <div className="relative w-full sm:w-auto">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={16} />
                     <input
                       type="text"
@@ -466,49 +400,6 @@ export default function App({
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ff4d00] w-full sm:w-64 transition-all"
                     />
-                    
-                    {/* Search Suggestions */}
-                    <AnimatePresence>
-                      {searchTerm.length > 2 && (
-                        <motion.div 
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 10 }}
-                          className="absolute top-full left-0 right-0 mt-2 bg-[#121212] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 max-h-[400px] overflow-y-auto"
-                        >
-                          {products
-                            .filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
-                            .slice(0, 6)
-                            .map(p => (
-                              <button
-                                key={p.sku}
-                                onClick={() => {
-                                  navigate(`${slugify(p.title)}`);
-                                  setSearchTerm('');
-                                }}
-                                className="w-full p-3 flex items-center gap-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 text-left"
-                              >
-                                <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center p-1 flex-shrink-0">
-                                  {p.img && !p.img.includes('no-product-image') ? (
-                                    <img src={p.img} alt={p.title} className="object-contain max-h-full max-w-full" referrerPolicy="no-referrer" />
-                                  ) : (
-                                    <Package size={20} className="text-gray-200" />
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-bold text-white truncate">{p.title}</p>
-                                  <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">SKU: {p.sku}</p>
-                                </div>
-                                <p className="text-xs font-black text-[#ff4d00]">{p.price}</p>
-                              </button>
-                            ))
-                          }
-                          {products.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
-                            <div className="p-4 text-center text-white/40 text-xs font-bold uppercase tracking-widest">No hay resultados</div>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
                   </div>
                   <button 
                     onClick={() => setShowFilters(!showFilters)}
@@ -621,11 +512,11 @@ export default function App({
                           
                           {/* Badges */}
                           <div className="absolute top-0 left-0 flex flex-col gap-1 p-2">
-                            {getStatusBadge(product).map((badge, idx) => (
-                              <div key={idx} className={`${badge.color} text-white text-[8px] font-black px-2 py-0.5 rounded-sm italic uppercase tracking-tighter shadow-lg`}>
-                                {badge.text}
+                            {parsePrice(product.price) > 10000 && (
+                              <div className="bg-[#ff4d00] text-white text-[9px] font-black px-2.5 py-1 rounded-sm italic uppercase tracking-tighter shadow-lg">
+                                Envío Gratis
                               </div>
-                            ))}
+                            )}
                           </div>
                           
                           <div className="absolute top-0 right-0 bg-[#1a1a1a] text-white/50 text-[8px] font-bold px-3 py-1.5 rounded-bl-xl border-l border-b border-white/5">
