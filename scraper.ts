@@ -20,20 +20,27 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 export let cachedProducts: any[] = [];
+export let scrapeProgress = { current_page: 0, total_products: 0, status: 'idle', isScraping: false };
+
+let isInitialized = false;
 
 // Initialize cachedProducts from Firestore
-const initCache = async () => {
+export const initCache = async () => {
+  if (isInitialized) return;
   try {
+    console.log("Initializing product cache from Firestore...");
     const q = query(collection(db, 'products'));
     const snapshot = await getDocs(q);
     cachedProducts = snapshot.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
+    isInitialized = true;
     console.log(`Cache initialized with ${cachedProducts.length} products from Firestore.`);
   } catch (err) {
     console.error("Failed to initialize product cache:", err);
   }
 };
-initCache();
-export let scrapeProgress = { current_page: 0, total_products: 0, status: 'idle', isScraping: false };
+
+// Call initCache but don't let it block module loading
+initCache().catch(err => console.error("Top-level initCache error:", err));
 
 async function updateScrapeStatus(status: any) {
   try {

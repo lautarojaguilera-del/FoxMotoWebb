@@ -344,17 +344,20 @@ export default function App({
 
   const fetchProducts = () => {
     fetch('/api/products')
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch products');
+      .then(async res => {
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.details || data.error || 'Failed to fetch products');
+        }
         return res.json();
       })
       .then(data => {
-        setProducts(data.products);
-        setProgress(data.progress);
+        setProducts(data.products || []);
+        setProgress(data.progress || { current_page: 0, total_products: 0, status: 'idle' });
         setLoading(false);
       })
       .catch(err => {
-        console.error(err);
+        console.error("Fetch products error:", err);
         setError(err.message);
         setLoading(false);
       });

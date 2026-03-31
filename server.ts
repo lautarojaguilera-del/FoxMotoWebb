@@ -210,14 +210,35 @@ app.post("/api/checkout", async (req, res) => {
 });
 
 app.get("/api/products", async (req, res) => {
+  console.log("GET /api/products called");
   try {
+    // If cache is empty, try to fetch from Firestore directly
+    let products = cachedProducts;
+    if (!products || products.length === 0) {
+      console.log("Cache empty, fetching from Firestore...");
+      try {
+        const { query, collection, getDocs } = await import("firebase/firestore");
+        const q = query(collection(db, 'products'));
+        const snapshot = await getDocs(q);
+        products = snapshot.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
+        console.log(`Fetched ${products.length} products directly from Firestore`);
+      } catch (firestoreErr: any) {
+        console.error("Direct Firestore fetch failed:", firestoreErr);
+      }
+    }
+
     res.json({
-      status: scrapeProgress.status,
-      progress: scrapeProgress,
-      products: cachedProducts
+      status: scrapeProgress?.status || 'idle',
+      progress: scrapeProgress || { current_page: 0, total_products: 0, status: 'idle', isScraping: false },
+      products: products || []
     });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to fetch products", details: err.message });
+    console.error("API /api/products error:", err);
+    res.status(500).json({ 
+      error: "Failed to fetch products", 
+      details: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 
@@ -278,5 +299,15 @@ if (!process.env.VERCEL) {
   scrapeAllPages();
   setInterval(scrapeAllPages, 30 * 60 * 1000);
 }
+
+// Global error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({ 
+    error: "Internal Server Error", 
+    details: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
 
 export default app;
