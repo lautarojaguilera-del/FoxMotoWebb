@@ -23,6 +23,8 @@ interface Product {
   price: string;
   stock: string;
   img: string | null;
+  salesCount?: number;
+  last_updated?: any;
 }
 
 interface SyncProgress {
@@ -287,7 +289,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<Layout cart={cart} setIsCartOpen={setIsCartOpen} />}>
-            <Route index element={<Home />} />
+            <Route index element={<Home products={products} />} />
             <Route path="envios-devoluciones" element={<ShippingReturns />} />
             <Route path="faq" element={<FAQ />} />
             <Route path="catalogo/*" element={
