@@ -193,14 +193,33 @@ app.post("/api/checkout", async (req, res) => {
 
 app.get("/api/products", async (req, res) => {
   try {
-    const { scrapeProgress, cachedProducts } = await import("./scraper");
+    const scraper = await import("./scraper");
+    const status = await scraper.getLatestScrapeStatus();
+    
+    // On Vercel or after cold start, cachedProducts might be empty.
+    // In that case, we fetch from Firestore.
+    let products = scraper.cachedProducts;
+    
+    if (products.length === 0) {
+      console.log("Cache empty, fetching products from Firestore...");
+      const { getDocs, collection } = await import("firebase/firestore");
+      const querySnapshot = await getDocs(collection(db, "products"));
+      products = querySnapshot.docs.map(doc => doc.data());
+      console.log(`Fetched ${products.length} products from Firestore.`);
+    }
+
     res.json({
-      status: scrapeProgress.status,
-      progress: scrapeProgress,
-      products: cachedProducts
+      status: status.status || 'idle',
+      progress: status,
+      products: products
     });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to fetch products", details: err.message });
+    console.error("Error in /api/products:", err);
+    res.status(500).json({ 
+      error: "Failed to fetch products", 
+      details: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 

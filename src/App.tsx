@@ -13,6 +13,7 @@ import Checkout from './pages/Checkout';
 import ShippingReturns from './pages/ShippingReturns';
 import FAQ from './pages/FAQ';
 import CatalogoApp from '../catalogo/src/App';
+import CartSidebar from './components/CartSidebar';
 import { db } from './firebase';
 import { collection, onSnapshot, query, doc, getDocFromServer } from 'firebase/firestore';
 
@@ -22,6 +23,8 @@ interface Product {
   price: string;
   stock: string;
   img: string | null;
+  salesCount?: number;
+  last_updated?: any;
 }
 
 interface SyncProgress {
@@ -175,16 +178,139 @@ export default function App() {
     return isNaN(num) ? 0 : num;
   };
 
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<'cart' | 'form' | 'processing' | 'success'>('cart');
+  const [customerForm, setCustomerForm] = useState({
+    email: '',
+    phone: '',
+    name: '',
+    lastname: '',
+    idNumber: '',
+    street: '',
+    streetNumber: '',
+    zipCode: ''
+  });
+
+  const parsePrice = (priceStr: string) => {
+    const cleaned = priceStr.replace(/[^0-9,-]+/g, "").replace(/\./g, "").replace(",", ".");
+    return parseFloat(cleaned) || 0;
+  };
+
+  const cartTotal = cart.reduce((sum, item) => sum + parsePrice(item.product.price) * item.quantity, 0);
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const addToCart = (product: Product) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.product.sku === product.sku);
+      if (existing) {
+        const stockAvailable = getStockNumber(product.stock);
+        if (existing.quantity >= stockAvailable) {
+          toast.error(`Solo hay ${stockAvailable} unidades disponibles`);
+          return prev;
+        }
+        return prev.map(item => 
+          item.product.sku === product.sku 
+            ? { ...item, quantity: item.quantity + 1 } 
+            : item
+        );
+      }
+      toast.success('Producto agregado al carrito');
+      return [...prev, { product, quantity: 1 }];
+    });
+    setIsCartOpen(true);
+  };
+
+  const removeFromCart = (sku: string) => {
+    setCart(prev => prev.filter(item => item.product.sku !== sku));
+    toast.info('Producto eliminado del carrito');
+  };
+
+  const updateQuantity = (sku: string, delta: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.product.sku === sku) {
+        const stockAvailable = getStockNumber(item.product.stock);
+        const newQ = item.quantity + delta;
+        if (newQ > stockAvailable) {
+          toast.error(`Solo hay ${stockAvailable} unidades disponibles`);
+          return item;
+        }
+        return { ...item, quantity: Math.max(1, newQ) };
+      }
+      return item;
+    }));
+  };
+
+  const checkoutWhatsApp = () => {
+    const text = cart.map(item => `${item.quantity}x ${item.product.title} (${item.product.sku}) - ${item.product.price}`).join('\n');
+    const totalStr = cartTotal.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
+    const message = `¡Hola FoxMoto! Quiero realizar el siguiente pedido:\n\n${text}\n\n*Total: ${totalStr}*`;
+    window.open(`https://wa.me/5492915221351?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  const handleCheckoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCheckoutStep('processing');
+    
+    try {
+      const text = cart.map(item => `${item.quantity}x ${item.product.title} (${item.product.sku}) - ${item.product.price}`).join('\n');
+      const totalStr = cartTotal.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
+      
+      const message = `hola fox te envio los datos de mi pedido\n\n*Carrito:*\n${text}\n\n*Monto Total: ${totalStr}*\n\n*Datos de contacto:*\nNombre: ${customerForm.name} ${customerForm.lastname}\nDNI/CUIT: ${customerForm.idNumber}\nEmail: ${customerForm.email}\nTeléfono: ${customerForm.phone}\nDirección: ${customerForm.street} ${customerForm.streetNumber}\nCódigo Postal: ${customerForm.zipCode}`;
+      
+      window.open(`https://wa.me/5492915221351?text=${encodeURIComponent(message)}`, '_blank');
+      
+      setCheckoutStep('success');
+      setCart([]);
+    } catch (error) {
+      console.error(error);
+      toast.error('Hubo un error al procesar tu pedido.');
+      setCheckoutStep('form');
+    }
+  };
+
   return (
     <>
       <Toaster position="top-center" richColors theme="dark" />
+      <CartSidebar 
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cart={cart}
+        cartTotal={cartTotal}
+        cartCount={cartCount}
+        updateQuantity={updateQuantity}
+        removeFromCart={removeFromCart}
+        checkoutStep={checkoutStep}
+        setCheckoutStep={setCheckoutStep}
+        customerForm={customerForm}
+        setCustomerForm={setCustomerForm}
+        checkoutWhatsApp={checkoutWhatsApp}
+        handleCheckoutSubmit={handleCheckoutSubmit}
+      />
       <BrowserRouter>
         <Routes>
-          <Route element={<Layout />}>
-            <Route index element={<Home />} />
+          <Route element={<Layout cart={cart} setIsCartOpen={setIsCartOpen} />}>
+            <Route index element={<Home products={products} />} />
             <Route path="envios-devoluciones" element={<ShippingReturns />} />
             <Route path="faq" element={<FAQ />} />
-            <Route path="catalogo" element={<CatalogoApp />} />
+            <Route path="catalogo/*" element={
+              <CatalogoApp 
+                cart={cart} 
+                setCart={setCart} 
+                isCartOpen={isCartOpen} 
+                setIsCartOpen={setIsCartOpen} 
+                addToCart={addToCart}
+                removeFromCart={removeFromCart}
+                updateQuantity={updateQuantity}
+                cartTotal={cartTotal}
+                cartCount={cartCount}
+                checkoutStep={checkoutStep}
+                setCheckoutStep={setCheckoutStep}
+                customerForm={customerForm}
+                setCustomerForm={setCustomerForm}
+                checkoutWhatsApp={checkoutWhatsApp}
+                handleCheckoutSubmit={handleCheckoutSubmit}
+              />
+            } />
           </Route>
           <Route path="/checkout" element={
             <Checkout 

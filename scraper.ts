@@ -1,5 +1,5 @@
 import { db } from "./src/firebase";
-import { doc, setDoc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, writeBatch, serverTimestamp, getDoc } from "firebase/firestore";
 
 enum OperationType {
   CREATE = 'create',
@@ -54,6 +54,25 @@ export async function getBrowser() {
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     });
   }
+}
+
+export async function getLatestScrapeStatus() {
+  try {
+    const statusDoc = await getDoc(doc(db, 'status', 'current'));
+    if (statusDoc.exists()) {
+      const data = statusDoc.data();
+      // Update local state if Firestore has more recent info
+      if (data.status && !scrapeProgress.isScraping) {
+        scrapeProgress.status = data.status;
+        scrapeProgress.current_page = data.current_page || 0;
+        scrapeProgress.total_products = data.total_products || 0;
+      }
+      return data;
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, 'status/current');
+  }
+  return scrapeProgress;
 }
 
 export async function scrapeAllPages() {
