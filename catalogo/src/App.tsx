@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { ShoppingCart, Search, Package, Loader2, AlertCircle, RefreshCw, X, Plus, Minus, ChevronLeft, ChevronRight, MessageCircle, Filter, Share2 } from 'lucide-react';
+import { ShoppingCart, Search, Package, Loader2, AlertCircle, RefreshCw, X, Plus, Minus, ChevronLeft, ChevronRight, MessageCircle, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Routes, Route, useNavigate, useParams, Link } from 'react-router-dom';
 
@@ -42,42 +42,6 @@ function ProductDetailView({ products, cartTotal, addToCart, setIsCartOpen }: {
     );
   }
 
-  const getCategory = (title: string) => {
-    const categories = [
-      { name: 'MOTOR', keywords: ['MOTOR', 'PISTON', 'VALVULA', 'CILINDRO', 'BIELA', 'JUNTA', 'CARBURADOR', 'FILTRO AIRE', 'FILTRO ACEITE'] },
-      { name: 'TRANSMISIÓN', keywords: ['CADENA', 'CORONA', 'PIÑON', 'TRANSMISION', 'EMBRAGUE', 'VARIADOR'] },
-      { name: 'FRENOS', keywords: ['FRENO', 'PASTILLA', 'ZAPATA', 'DISCO', 'CABLE FRENO'] },
-      { name: 'SUSPENSIÓN', keywords: ['AMORTIGUADOR', 'BARRAL', 'RETEN', 'HORQUILLA'] },
-      { name: 'ELÉCTRICO', keywords: ['BATERIA', 'BUJIA', 'BOBINA', 'CDI', 'REGULADOR', 'ESTATOR', 'LAMPARA', 'GIRO', 'FARO'] },
-      { name: 'CHASIS', keywords: ['ESPEJO', 'MANUBRIO', 'PUÑO', 'ASIENTO', 'TANQUE', 'GUARDABARRO', 'PLASTICO', 'CABALLETE'] },
-      { name: 'CUBIERTAS', keywords: ['CUBIERTA', 'CAMARA', 'LLANTA', 'RAYO'] },
-      { name: 'ACCESORIOS', keywords: ['CASCO', 'GUANTE', 'ACEITE', 'LUBRICANTE', 'CADENA SEGURIDAD', 'BAUL', 'PARABRISA'] }
-    ];
-    const titleUpper = title.toUpperCase();
-    for (const cat of categories) {
-      if (cat.keywords.some(k => titleUpper.includes(k))) return cat.name;
-    }
-    return 'OTROS';
-  };
-
-  const productCategory = getCategory(product.title);
-  const relatedProducts = products
-    .filter(p => p.sku !== product.sku && getCategory(p.title) === productCategory)
-    .slice(0, 4);
-
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: product.title,
-        text: `Mira este repuesto en FoxMoto: ${product.title}`,
-        url: window.location.href,
-      }).catch(console.error);
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      alert('Enlace copiado al portapapeles');
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#0a0a0a] bg-[radial-gradient(circle_at_50%_50%,_#1a1a1a_0%,_#0a0a0a_100%)] text-white flex flex-col">
       {/* Detail Header */}
@@ -89,116 +53,66 @@ function ProductDetailView({ products, cartTotal, addToCart, setIsCartOpen }: {
           <ChevronLeft size={20} />
           <span>Volver al Catálogo</span>
         </button>
-        <div className="hidden sm:flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white/30">
-          <Link to="/" className="hover:text-white">Inicio</Link>
-          <span>/</span>
-          <Link to="/catalogo" className="hover:text-white">Catálogo</Link>
-          <span>/</span>
-          <span className="text-[#ff4d00]">{productCategory}</span>
-        </div>
-        <button 
-          onClick={handleShare}
-          className="p-2 text-white/70 hover:text-[#ff4d00] transition-colors"
-          title="Compartir"
-        >
-          <Share2 size={20} />
-        </button>
+        <h2 className="text-xl font-black text-white uppercase tracking-tighter italic absolute left-1/2 -translate-x-1/2 hidden sm:block">Detalles del Producto</h2>
+        <div className="w-20"></div> {/* Spacer to keep title centered */}
       </header>
 
       {/* Detail Content */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-8">
-        <div className="max-w-6xl mx-auto space-y-12">
-          <div className="bg-[#121212] rounded-3xl shadow-2xl border border-white/5 overflow-hidden flex flex-col md:flex-row">
-            {/* Image Section */}
-            <div className="md:w-1/2 p-8 flex flex-col gap-4 bg-white m-4 rounded-2xl">
-              <div className="aspect-square flex items-center justify-center p-8">
-                {product.img && !product.img.includes('no-product-image') ? (
-                  <img src={product.img} alt={product.title} className="object-contain max-h-full max-w-full" referrerPolicy="no-referrer" />
-                ) : (
-                  <Package size={120} className="text-gray-100" />
-                )}
-              </div>
-            </div>
-
-            {/* Info Section */}
-            <div className="md:w-1/2 p-8 sm:p-12 flex flex-col">
-              <span className="text-xs font-black text-white/30 uppercase tracking-widest mb-2 bg-white/5 px-3 py-1 rounded-full border border-white/5 inline-block w-fit">SKU: {product.sku}</span>
-              <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight mb-8 uppercase italic tracking-tighter">
-                {product.title}
-              </h1>
-              
-              <div className="mb-12">
-                <p className="text-5xl font-black text-[#ff4d00] tracking-tighter italic">
-                  {product.price}
-                </p>
-                <p className="text-white/40 text-xs font-bold uppercase tracking-widest mt-2">Precio contado / transferencia</p>
-              </div>
-
-              <div className="mt-auto space-y-6">
-                <div className="flex items-center gap-2 text-white/60 font-bold uppercase tracking-widest text-xs">
-                  <span>Stock:</span>
-                  <span className="text-[#ff4d00]">{product.stock.toLowerCase().includes('ilimitado') ? 'Ilimitado' : product.stock}</span>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <button 
-                    onClick={() => {
-                      addToCart(product);
-                    }}
-                    className="flex-1 bg-[#ff4d00] hover:bg-[#ff6a00] text-white font-black uppercase tracking-widest text-xs py-5 px-8 rounded-2xl transition-all shadow-lg shadow-orange-900/20 flex items-center justify-center gap-3"
-                  >
-                    <ShoppingCart size={20} />
-                    <span>Agregar al carrito</span>
-                  </button>
-                  <button 
-                    onClick={() => {
-                      const text = `¡Hola FoxMoto! Me interesa el producto: ${product.title} (SKU: ${product.sku})`;
-                      window.open(`https://wa.me/5492915221351?text=${encodeURIComponent(text)}`, '_blank');
-                    }}
-                    className="flex-1 border-2 border-white/10 hover:border-white/20 text-white font-black uppercase tracking-widest text-xs py-5 px-8 rounded-2xl transition-all flex items-center justify-center gap-3 bg-white/5"
-                  >
-                    <MessageCircle size={20} />
-                    <span>Consultar WhatsApp</span>
-                  </button>
-                </div>
-              </div>
+        <div className="max-w-6xl mx-auto bg-[#121212] rounded-3xl shadow-2xl border border-white/5 overflow-hidden flex flex-col md:flex-row">
+          {/* Image Section */}
+          <div className="md:w-1/2 p-8 flex flex-col gap-4 bg-white m-4 rounded-2xl">
+            <div className="aspect-square flex items-center justify-center p-8">
+              {product.img && !product.img.includes('no-product-image') ? (
+                <img src={product.img} alt={product.title} className="object-contain max-h-full max-w-full" referrerPolicy="no-referrer" />
+              ) : (
+                <Package size={120} className="text-gray-100" />
+              )}
             </div>
           </div>
 
-          {/* Related Products */}
-          {relatedProducts.length > 0 && (
-            <div className="space-y-6">
-              <h3 className="text-xl font-black text-white uppercase tracking-tighter italic border-l-4 border-[#ff4d00] pl-4">También te puede interesar</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                {relatedProducts.map(p => (
-                  <Link 
-                    key={p.sku} 
-                    to={`/catalogo/${slugify(p.title)}`}
-                    className="bg-[#121212] rounded-2xl p-4 border border-white/5 hover:border-[#ff4d00]/30 transition-all group"
-                  >
-                    <div className="aspect-square bg-white rounded-xl mb-4 flex items-center justify-center p-4 overflow-hidden">
-                      {p.img && !p.img.includes('no-product-image') ? (
-                        <img src={p.img} alt={p.title} className="object-contain max-h-full max-w-full group-hover:scale-110 transition-transform" referrerPolicy="no-referrer" />
-                      ) : (
-                        <Package size={40} className="text-gray-200" />
-                      )}
-                    </div>
-                    <h4 className="text-xs font-bold text-white line-clamp-2 mb-2 h-8">{p.title}</h4>
-                    <p className="text-[#ff4d00] font-black tracking-tighter">{p.price}</p>
-                  </Link>
-                ))}
+          {/* Info Section */}
+          <div className="md:w-1/2 p-8 sm:p-12 flex flex-col">
+            <span className="text-xs font-black text-white/30 uppercase tracking-widest mb-2 bg-white/5 px-3 py-1 rounded-full border border-white/5 inline-block w-fit">SKU: {product.sku}</span>
+            <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight mb-8 uppercase italic tracking-tighter">
+              {product.title}
+            </h1>
+            
+            <div className="mb-12">
+              <p className="text-5xl font-black text-[#ff4d00] tracking-tighter italic">
+                {product.price}
+              </p>
+              <p className="text-white/40 text-xs font-bold uppercase tracking-widest mt-2">Precio contado / transferencia</p>
+            </div>
+
+            <div className="mt-auto space-y-6">
+              <div className="flex items-center gap-2 text-white/60 font-bold uppercase tracking-widest text-xs">
+                <span>Stock:</span>
+                <span className="text-[#ff4d00]">{product.stock.toLowerCase().includes('ilimitado') ? 'Ilimitado' : product.stock}</span>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button 
+                  onClick={() => {
+                    addToCart(product);
+                  }}
+                  className="flex-1 bg-[#ff4d00] hover:bg-[#ff6a00] text-white font-black uppercase tracking-widest text-xs py-5 px-8 rounded-2xl transition-all shadow-lg shadow-orange-900/20 flex items-center justify-center gap-3"
+                >
+                  <ShoppingCart size={20} />
+                  <span>Agregar al carrito</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    const text = `¡Hola FoxMoto! Me interesa el producto: ${product.title} (SKU: ${product.sku})`;
+                    window.open(`https://wa.me/5492915221351?text=${encodeURIComponent(text)}`, '_blank');
+                  }}
+                  className="flex-1 border-2 border-white/10 hover:border-white/20 text-white font-black uppercase tracking-widest text-xs py-5 px-8 rounded-2xl transition-all flex items-center justify-center gap-3 bg-white/5"
+                >
+                  <MessageCircle size={20} />
+                  <span>Consultar WhatsApp</span>
+                </button>
               </div>
             </div>
-          )}
-
-          <div className="flex justify-center pt-8">
-            <button 
-              onClick={() => navigate('/catalogo')}
-              className="text-white/40 hover:text-white font-black uppercase tracking-widest text-[10px] flex items-center gap-2 transition-all"
-            >
-              <ChevronLeft size={14} />
-              <span>Seguir comprando repuestos</span>
-            </button>
           </div>
         </div>
       </div>
