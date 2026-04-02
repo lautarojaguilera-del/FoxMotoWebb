@@ -1,8 +1,7 @@
 import express from "express";
 import path from "path";
 import { db } from "./src/firebase";
-import { doc, setDoc, serverTimestamp, collection, addDoc, getDocs, getDoc } from "firebase/firestore";
-import * as scraper from "./scraper";
+import { doc, setDoc, serverTimestamp, collection, addDoc, writeBatch, increment } from "firebase/firestore";
 
 export const app = express();
 const PORT = process.env.PORT || 3000;
@@ -28,7 +27,8 @@ app.post("/api/checkout", async (req, res) => {
   console.log("Starting automated checkout process...");
   
   try {
-    const browser = await scraper.getBrowser();
+    const { getBrowser } = await import("./scraper");
+    const browser = await getBrowser();
     const page = await browser.newPage();
     
     // 1. Go to the store
@@ -180,6 +180,24 @@ app.post("/api/checkout", async (req, res) => {
     
     await browser.close();
     
+    if (orderDetails.success) {
+      try {
+        const batch = writeBatch(db);
+        for (const item of items) {
+          const productRef = doc(db, 'products', item.product.sku);
+          // We use increment to track sales
+          batch.update(productRef, {
+            salesCount: increment(item.quantity)
+          });
+        }
+        await batch.commit();
+        console.log("Sales counts updated in Firestore.");
+      } catch (err) {
+        console.error("Failed to update sales counts:", err);
+        // We don't fail the whole request if this fails
+      }
+    }
+    
     res.json({ 
       success: true, 
       message: "Checkout automated successfully!",
@@ -193,42 +211,26 @@ app.post("/api/checkout", async (req, res) => {
 
 app.get("/api/products", async (req, res) => {
   try {
-    const status = await scraper.getLatestScrapeStatus();
-    
-    // On Vercel or after cold start, cachedProducts might be empty.
-    // In that case, we fetch from Firestore.
-    let products = scraper.getCachedProducts();
-    
-    if (products.length === 0) {
-      console.log("Cache empty, fetching products from Firestore...");
-      const querySnapshot = await getDocs(collection(db, "products"));
-      products = querySnapshot.docs.map(doc => doc.data());
-      console.log(`Fetched ${products.length} products from Firestore.`);
-    }
-
+    const { scrapeProgress, cachedProducts } = await import("./scraper");
     res.json({
-      status: status.status || 'idle',
-      progress: status,
-      products: products
+      status: scrapeProgress.status,
+      progress: scrapeProgress,
+      products: cachedProducts
     });
   } catch (err: any) {
-    console.error("Error in /api/products:", err);
-    res.status(500).json({ 
-      error: "Failed to fetch products", 
-      details: err.message,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
+    res.status(500).json({ error: "Failed to fetch products", details: err.message });
   }
 });
 
 app.post("/api/scrape/start", async (req, res) => {
   try {
-    if (scraper.getScrapeProgress().isScraping) {
+    const { scrapeAllPages, scrapeProgress } = await import("./scraper");
+    if (scrapeProgress.isScraping) {
       return res.status(400).json({ error: "Scrape already in progress" });
     }
     
     // Trigger in background
-    scraper.scrapeAllPages().catch(err => console.error("Manual scrape error:", err));
+    scrapeAllPages().catch(err => console.error("Manual scrape error:", err));
     
     res.json({ message: "Scrape started" });
   } catch (err: any) {
@@ -239,7 +241,8 @@ app.post("/api/scrape/start", async (req, res) => {
 
 app.post("/api/scrape/reset", async (req, res) => {
   try {
-    await scraper.forceResetScraper();
+    const { forceResetScraper } = await import("./scraper");
+    await forceResetScraper();
     res.json({ message: "Scraper reset" });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to reset scraper", details: err.message });
@@ -275,14 +278,10 @@ if (!process.env.VERCEL) {
   setupFrontend();
   
   // Start background scrape
-  console.log("Starting background scrape...");
-  scraper.scrapeAllPages().catch(err => {
-    console.error("Background scrape failed to start:", err);
+  import("./scraper").then(({ scrapeAllPages }) => {
+    scrapeAllPages();
+    setInterval(scrapeAllPages, 30 * 60 * 1000);
   });
-  setInterval(() => {
-    console.log("Running scheduled scrape...");
-    scraper.scrapeAllPages().catch(err => console.error("Scheduled scrape error:", err));
-  }, 30 * 60 * 1000);
 }
 
 export default app;

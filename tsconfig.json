@@ -11,8 +11,6 @@
     ],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "esModuleInterop": true,
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
