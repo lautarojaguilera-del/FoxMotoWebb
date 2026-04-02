@@ -7,10 +7,16 @@ import { getAnalytics, isSupported } from 'firebase/analytics';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase SDK
+console.log("Initializing Firebase with project:", firebaseConfig.projectId);
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)' 
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId) 
+const dbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)' 
+  ? firebaseConfig.firestoreDatabaseId 
+  : '(default)';
+
+console.log("Using Firestore database:", dbId);
+export const db = dbId !== '(default)' 
+  ? getFirestore(app, dbId) 
   : getFirestore(app);
 
 export const auth = getAuth(app);

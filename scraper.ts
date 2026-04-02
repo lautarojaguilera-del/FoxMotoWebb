@@ -75,6 +75,7 @@ export async function scrapeAllPages() {
   scrapeProgress.status = 'syncing';
   scrapeProgress.current_page = 1;
   console.log("Starting full catalog scrape...");
+  await initCache(); // Ensure cache is fresh before starting
   await updateScrapeStatus(scrapeProgress);
   
   let browser;
@@ -82,7 +83,6 @@ export async function scrapeAllPages() {
     browser = await getBrowser();
     const page = await browser.newPage();
     let currentPage = 1;
-    let allProducts: any[] = [];
     let hasMore = true;
     
     while (hasMore) {
@@ -139,33 +139,50 @@ export async function scrapeAllPages() {
         break;
       }
       
-      allProducts.push(...pageProducts);
-      
-      // Filter duplicates by SKU and update cache progressively
-      const uniqueProducts = Array.from(new Map(allProducts.map(p => [p?.sku, p])).values());
-      cachedProducts = uniqueProducts;
-      scrapeProgress.total_products = cachedProducts.length;
-      
-      // Save to Firestore in batches
+      // Save to Firestore in batches only if there are changes
       try {
         const batch = writeBatch(db);
+        let changedCount = 0;
+        
         for (const p of pageProducts) {
           if (p && p.sku) {
-            const productRef = doc(db, 'products', p.sku);
-            // We use set with merge: true to avoid overwriting salesCount and firstSeenAt
-            // However, we need to ensure firstSeenAt is only set once.
-            // Since we can't easily check existence in a batch without reads, 
-            // we'll just set last_updated and the basic info.
-            // The frontend will handle "New" logic based on last_updated vs firstSeenAt if we had it,
-            // but for now let's just ensure we don't wipe salesCount.
-            batch.set(productRef, {
-              ...p,
-              last_updated: serverTimestamp()
-            }, { merge: true });
+            // Find existing product in cache to compare
+            const existing = cachedProducts.find(cp => cp.sku === p.sku);
+            
+            // Compare relevant fields to detect changes
+            const hasChanged = !existing || 
+              existing.title !== p.title || 
+              existing.price !== p.price || 
+              existing.stock !== p.stock || 
+              existing.img !== p.img;
+
+            if (hasChanged) {
+              const productRef = doc(db, 'products', p.sku);
+              batch.set(productRef, {
+                ...p,
+                last_updated: serverTimestamp()
+              }, { merge: true });
+              
+              changedCount++;
+              
+              // Update local cache so we don't re-detect changes if we hit it again
+              if (existing) {
+                Object.assign(existing, p);
+              } else {
+                cachedProducts.push(p);
+              }
+            }
           }
         }
-        await batch.commit();
-        console.log(`Saved ${pageProducts.length} products to Firestore batch.`);
+        
+        scrapeProgress.total_products = cachedProducts.length;
+
+        if (changedCount > 0) {
+          await batch.commit();
+          console.log(`Saved ${changedCount} changed products to Firestore batch.`);
+        } else {
+          console.log(`No changes detected for ${pageProducts.length} products on page ${currentPage}. Skipping Firestore write.`);
+        }
       } catch (error) {
         handleFirestoreError(error, OperationType.WRITE, 'products');
       }

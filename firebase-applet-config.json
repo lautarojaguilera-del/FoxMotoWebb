@@ -1,10 +1,10 @@
 {
-  "projectId": "alertasbhi",
-  "appId": "1:462771320707:web:475091bd3a33005bd2e8b6",
-  "apiKey": "AIzaSyAllqbYenskmsccGG1gyU5BUvgc03jlo0c",
-  "authDomain": "alertasbhi.firebaseapp.com",
+  "projectId": "foxmotorep",
+  "appId": "1:87501205952:web:6a8e99cb3e1a438ec19825",
+  "apiKey": "AIzaSyCcVmBVqxOl7fcZwo0SwKqpK5vIxR_Ipfk",
+  "authDomain": "foxmotorep.firebaseapp.com",
   "firestoreDatabaseId": "(default)",
-  "storageBucket": "alertasbhi.firebasestorage.app",
-  "messagingSenderId": "462771320707",
-  "measurementId": "G-ZJDEB9XGFC"
+  "storageBucket": "foxmotorep.firebasestorage.app",
+  "messagingSenderId": "87501205952",
+  "measurementId": "G-H7J1X20ZN2"
 }
